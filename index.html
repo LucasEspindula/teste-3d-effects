@@ -125,6 +125,37 @@ function splitGeometry(geometry,splitY){
   for(let i=0;i<p.count;i+=3){const cy=(p.getY(i)+p.getY(i+1)+p.getY(i+2))/3;copyTri(g,i,cy>=splitY?top:bot)}
   return {top:makeGeom(top),bottom:makeGeom(bot)};
 }
+function buildLidLining(size, splitY, maxY){
+  const g = new THREE.Group();
+  // Seção interna em arco: em vez de uma placa reta, cria uma meia-cana tipo "C".
+  // O arco corre no eixo X (profundidade) e é extrudado pela largura Z do baú.
+  const widthZ = Math.max(.1, size.z * .84);
+  const radiusX = Math.max(.08, size.x * .43);
+  const radiusY = Math.max(.08, (maxY - splitY) * .82);
+  const centerY = splitY + (maxY - splitY) * .12;
+  const segments = 18;
+  const positions = [];
+  const uvs = [];
+  for(let i=0;i<segments;i++){
+    const a0 = Math.PI * i/segments;
+    const a1 = Math.PI * (i+1)/segments;
+    const x0 = Math.cos(a0)*radiusX, y0 = centerY + Math.sin(a0)*radiusY;
+    const x1 = Math.cos(a1)*radiusX, y1 = centerY + Math.sin(a1)*radiusY;
+    const z0 = -widthZ*.5, z1 = widthZ*.5;
+    positions.push(x0,y0,z0, x0,y0,z1, x1,y1,z1, x0,y0,z0, x1,y1,z1, x1,y1,z0);
+    const u0=i/segments,u1=(i+1)/segments;
+    uvs.push(u0,0,u0,1,u1,1, u0,0,u1,1,u1,0);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geo.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo,innerMat);
+  mesh.receiveShadow=true;
+  g.add(mesh);
+  return g;
+}
+
 function buildInnerLining(size, splitY, minY){
   const g = new THREE.Group();
   // Afina menos as bordas para o forro interno ocupar mais espaço lateral.
@@ -182,6 +213,10 @@ try{
   const norm=2.65/Math.max(size.x,size.y,size.z); chestRoot.scale.setScalar(norm);
   const py=(splitY-center.y), px=(hingeX-center.x);
   lidPivot.position.set(px,py,0); lidGroup.position.set(-px,-py,0);
+  // Forro curvo acompanha a tampa porque vive dentro do lidGroup.
+  const lidLining = buildLidLining(size, splitY, bounds.max.y);
+  lidLining.position.set(-center.x,-center.y,-center.z);
+  lidGroup.add(lidLining);
   const innerLining = buildInnerLining(size, splitY, bounds.min.y);
   // Recuo leve para trás e pequeno ajuste lateral de encaixe.
   innerLining.position.set(
