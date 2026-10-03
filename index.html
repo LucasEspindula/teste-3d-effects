@@ -44,7 +44,8 @@ canvas{display:block;width:100%;height:100%;position:relative;z-index:0}
     <label>X <input id="liningX" type="range" min="-2" max="2" step="0.01" value="0"><output id="liningXOut">0.00</output></label>
     <label>Y <input id="liningY" type="range" min="-2" max="2" step="0.01" value="-0.32"><output id="liningYOut">-0.32</output></label>
     <label>Z <input id="liningZ" type="range" min="-2" max="2" step="0.01" value="0"><output id="liningZOut">0.00</output></label>
-    <label>G <input id="liningFat" type="range" min="0.7" max="1.8" step="0.01" value="1"><output id="liningFatOut">1.00</output></label>
+    <label>L <input id="liningWidth" type="range" min="0.5" max="2.2" step="0.01" value="1"><output id="liningWidthOut">1.00</output></label>
+    <label>P <input id="liningDepth" type="range" min="0.5" max="2.2" step="0.01" value="1"><output id="liningDepthOut">1.00</output></label>
     <button id="liningReset" type="button">Resetar</button>
   </div>
 <div id="app"></div>
@@ -205,14 +206,17 @@ const liningControls = {
   x: document.getElementById('liningX'),
   y: document.getElementById('liningY'),
   z: document.getElementById('liningZ'),
-  fat: document.getElementById('liningFat')
+  width: document.getElementById('liningWidth'),
+  depth: document.getElementById('liningDepth')
 };
 function updateLiningPosition(){
   const x = Number(liningControls.x.value);
   const y = Number(liningControls.y.value);
   const z = Number(liningControls.z.value);
-  const fat = Number(liningControls.fat.value);
-  innerLining.scale.set(fat,1,fat);
+  const width = Number(liningControls.width.value);
+  const depth = Number(liningControls.depth.value);
+  // O revestimento interno está rotacionado 90° em Y: largura visual = X local, profundidade = Z local.
+  innerLining.scale.set(width,1,depth);
   innerLining.position.set(
     liningBase.x + size.x*x,
     liningBase.y + size.y*y,
@@ -221,14 +225,16 @@ function updateLiningPosition(){
   document.getElementById('liningXOut').value=x.toFixed(2);
   document.getElementById('liningYOut').value=y.toFixed(2);
   document.getElementById('liningZOut').value=z.toFixed(2);
-  document.getElementById('liningFatOut').value=fat.toFixed(2);
+  document.getElementById('liningWidthOut').value=width.toFixed(2);
+  document.getElementById('liningDepthOut').value=depth.toFixed(2);
 }
 Object.values(liningControls).forEach(el=>el.addEventListener('input',updateLiningPosition));
 document.getElementById('liningReset').addEventListener('click',()=>{
   liningControls.x.value='0';
   liningControls.y.value='-0.32';
   liningControls.z.value='0';
-  liningControls.fat.value='1';
+  liningControls.width.value='1';
+  liningControls.depth.value='1';
   updateLiningPosition();
 });
 updateLiningPosition();
