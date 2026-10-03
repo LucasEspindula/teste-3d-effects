@@ -1,1 +1,243 @@
-<!doctype html><html><head><meta charset="utf-8"><title>teste-3d-effects</title></head><body><h1>Inicializando baú 3D…</h1></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Baú 3D Real — Loot</title>
+<style>
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#06070c;color:#fff;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:radial-gradient(circle at 50% 35%,#222044 0,#111226 31%,#080912 62%,#05060a 100%)}
+#app{position:fixed;inset:0}
+#app:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 62%,rgba(255,188,70,.12),transparent 26%),linear-gradient(180deg,transparent 65%,rgba(0,0,0,.56));z-index:1}
+canvas{display:block;width:100%;height:100%;position:relative;z-index:0}
+.ui{position:fixed;inset:0;z-index:3;pointer-events:none;display:flex;flex-direction:column;align-items:center}
+.title{margin-top:clamp(24px,5vh,54px);text-align:center;text-shadow:0 8px 36px #000}
+.title h1{margin:0;font-size:clamp(27px,4.6vw,56px);letter-spacing:-.045em;font-weight:800}
+.title p{margin:8px 0 0;color:#c9c9d9;font-size:clamp(13px,1.8vw,16px)}
+.badge{display:inline-flex;align-items:center;gap:8px;margin-bottom:11px;padding:7px 11px;border:1px solid #ffffff18;border-radius:999px;background:#ffffff0d;backdrop-filter:blur(12px);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#d9d8eb}
+.badge i{width:7px;height:7px;border-radius:50%;background:#71f1b2;box-shadow:0 0 15px #71f1b2}
+#loading{position:fixed;inset:0;z-index:8;display:grid;place-items:center;background:radial-gradient(circle,#17172c,#06070c);transition:opacity .45s ease,visibility .45s ease}
+#loading.hide{opacity:0;visibility:hidden}
+.loader{text-align:center;color:#d8d8e8}.spinner{width:42px;height:42px;border:3px solid #ffffff18;border-top-color:#f5bd55;border-radius:50%;margin:0 auto 16px;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+#loot{position:fixed;left:50%;bottom:clamp(28px,7vh,70px);z-index:5;transform:translate(-50%,24px) scale(.94);opacity:0;transition:.42s cubic-bezier(.2,.8,.2,1);pointer-events:none;text-align:center;min-width:min(88vw,390px)}
+#loot.show{opacity:1;transform:translate(-50%,0) scale(1)}
+.loot-card{padding:18px 22px;border-radius:20px;background:linear-gradient(180deg,#1e2034dd,#10111ddd);border:1px solid #ffffff20;box-shadow:0 22px 60px #0009,inset 0 1px #fff2;backdrop-filter:blur(16px)}
+#rarity{font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:800;margin-bottom:7px;color:#f0bd58}#item{font-size:clamp(22px,3.7vw,34px);font-weight:850;letter-spacing:-.035em}#desc{color:#b9b9ca;margin-top:5px;font-size:13px}
+#tip{position:fixed;left:50%;bottom:15px;z-index:4;transform:translateX(-50%);font-size:11px;color:#77798b;letter-spacing:.05em;white-space:nowrap}
+#error{position:fixed;left:50%;top:50%;z-index:20;transform:translate(-50%,-50%);display:none;width:min(90vw,560px);padding:18px 20px;border-radius:16px;background:#260f18e8;border:1px solid #ff698044;color:#ffdbe1;line-height:1.45}
+@media(max-width:600px){.title{margin-top:24px}.title p{padding:0 20px}#tip{bottom:8px}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="loading"><div class="loader"><div class="spinner"></div><div>Carregando o baú 3D real…</div></div></div>
+<div class="ui"><div class="title"><div class="badge"><i></i> FBX + PBR REAL</div><h1>Baú do Tesouro</h1><p>Arraste para girar. Clique no baú para abrir.</p></div></div>
+<div id="loot"><div class="loot-card"><div id="rarity">LENDÁRIO</div><div id="item">Coroa do Eclipse</div><div id="desc">Um loot raro apareceu do baú.</div></div></div>
+<div id="tip">ARRASTE • SCROLL PARA ZOOM • CLIQUE PARA ABRIR</div>
+<div id="error"></div>
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const FBX_URL = './assets/chest.fbx';;
+const TEX = {"base":"./assets/base.png","normal":"./assets/normal.png","metallic":"./assets/metallic.png","roughness":"./assets/roughness.png","ao":"./assets/ao.png","height":"./assets/height.png"};
+const app = document.querySelector('#app');
+const loading = document.querySelector('#loading');
+const errorBox = document.querySelector('#error');
+const lootBox = document.querySelector('#loot');
+const rarityEl = document.querySelector('#rarity');
+const itemEl = document.querySelector('#item');
+const descEl = document.querySelector('#desc');
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x080914, .075);
+const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, .05, 100);
+camera.position.set(3.2,2.25,4.8);
+
+const renderer = new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
+app.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor=.065; controls.enablePan=false;
+controls.minDistance=2.4; controls.maxDistance=7.2; controls.target.set(0,.12,0);
+controls.maxPolarAngle=Math.PI*.72; controls.minPolarAngle=Math.PI*.17;
+
+renderer.domElement.style.cursor='grab';
+renderer.domElement.addEventListener('pointerdown',()=>renderer.domElement.style.cursor='grabbing');
+renderer.domElement.addEventListener('pointerup',()=>renderer.domElement.style.cursor='grab');
+
+const hemi = new THREE.HemisphereLight(0x8ea3ff,0x2b1308,1.65); scene.add(hemi);
+const key = new THREE.SpotLight(0xffd28a,75,14,Math.PI*.26,.55,1.6); key.position.set(3.5,5,4.3); key.castShadow=true; key.shadow.mapSize.set(1024,1024); scene.add(key);
+const rim = new THREE.SpotLight(0x786dff,95,12,Math.PI*.34,.75,1.2); rim.position.set(-4.3,3.6,-3.5); scene.add(rim);
+const warm = new THREE.PointLight(0xff8d38,10,5,2); warm.position.set(0,-.5,1); scene.add(warm);
+
+const ground = new THREE.Mesh(new THREE.CircleGeometry(3.25,96),new THREE.MeshStandardMaterial({color:0x0b0c14,roughness:.85,metalness:.08,transparent:true,opacity:.78}));
+ground.rotation.x=-Math.PI/2; ground.position.y=-1.04; ground.receiveShadow=true; scene.add(ground);
+const ring = new THREE.Mesh(new THREE.RingGeometry(1.25,1.31,96),new THREE.MeshBasicMaterial({color:0xd98a34,transparent:true,opacity:.2,side:THREE.DoubleSide})); ring.rotation.x=-Math.PI/2; ring.position.y=-1.025; scene.add(ring);
+
+function decodeBase64(b64){const bin=atob(b64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return bytes.buffer}
+const tLoader = new THREE.TextureLoader();
+function tex(src,srgb=false){const t=tLoader.load(src);t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());if(srgb)t.colorSpace=THREE.SRGBColorSpace;return t}
+const baseMap=tex(TEX.base,true), normalMap=tex(TEX.normal), metalMap=tex(TEX.metallic), roughMap=tex(TEX.roughness), aoMap=tex(TEX.ao), heightMap=tex(TEX.height);
+const chestMat = new THREE.MeshStandardMaterial({map:baseMap,normalMap,metalnessMap:metalMap,roughnessMap:roughMap,aoMap,metalness:1,roughness:1,normalScale:new THREE.Vector2(.92,.92),bumpMap:heightMap,bumpScale:.018});
+chestMat.envMapIntensity=1.0;
+const innerMat = new THREE.MeshStandardMaterial({color:0x2f1d12,roughness:.96,metalness:.05,side:THREE.DoubleSide});
+innerMat.envMapIntensity=.35;
+
+const chestFloat = new THREE.Group(); scene.add(chestFloat);
+const chestRoot = new THREE.Group(); chestFloat.add(chestRoot);
+const bodyGroup = new THREE.Group(); chestRoot.add(bodyGroup);
+const lidPivot = new THREE.Group(); chestRoot.add(lidPivot);
+const lidGroup = new THREE.Group(); lidPivot.add(lidGroup);
+const hitMeshes=[];
+let closedRot=0, openTarget=0, openProgress=0, ready=false;
+let chestSize = new THREE.Vector3(2,2,2);
+
+function copyTri(src,i,arrs){
+  const pos=src.getAttribute('position'), nor=src.getAttribute('normal'), uv=src.getAttribute('uv');
+  for(let k=0;k<3;k++){
+    const n=i+k; arrs.p.push(pos.getX(n),pos.getY(n),pos.getZ(n));
+    if(nor) arrs.n.push(nor.getX(n),nor.getY(n),nor.getZ(n));
+    if(uv) arrs.u.push(uv.getX(n),uv.getY(n));
+  }
+}
+function makeGeom(arrs){
+  if(!arrs.p.length)return null; const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(arrs.p,3));
+  if(arrs.n.length)g.setAttribute('normal',new THREE.Float32BufferAttribute(arrs.n,3)); else g.computeVertexNormals();
+  if(arrs.u.length){g.setAttribute('uv',new THREE.Float32BufferAttribute(arrs.u,2));g.setAttribute('uv1',new THREE.Float32BufferAttribute(arrs.u.slice(),2));}
+  g.computeBoundingBox();g.computeBoundingSphere();return g;
+}
+function splitGeometry(geometry,splitY){
+  let g=geometry.index?geometry.toNonIndexed():geometry.clone();
+  const p=g.getAttribute('position'); const top={p:[],n:[],u:[]},bot={p:[],n:[],u:[]};
+  for(let i=0;i<p.count;i+=3){const cy=(p.getY(i)+p.getY(i+1)+p.getY(i+2))/3;copyTri(g,i,cy>=splitY?top:bot)}
+  return {top:makeGeom(top),bottom:makeGeom(bot)};
+}
+function buildInnerLining(size, splitY, minY){
+  const g = new THREE.Group();
+  // Afina menos as bordas para o forro interno ocupar mais espaço lateral.
+  const insetX = Math.max(size.x*.085, .045);
+  const insetZ = Math.max(size.z*.075, .045);
+  const floorInset = Math.max(size.y*.06, .035);
+  const wallTopInset = Math.max(size.y*.045, .03);
+  const innerDepth = Math.max(.1, size.x - insetX*2);
+  const innerWidth = Math.max(.1, size.z - insetZ*2);
+  const innerHeight = Math.max(.08, (splitY-minY) - floorInset - wallTopInset);
+  const floorY = (minY + floorInset);
+  const wallCenterY = floorY + innerHeight*.5;
+  const mk = (geo,x,y,z,rx=0,ry=0,rz=0) => {
+    const m = new THREE.Mesh(geo, innerMat);
+    m.position.set(x,y,z); m.rotation.set(rx,ry,rz);
+    m.castShadow=false; m.receiveShadow=true;
+    g.add(m);
+    return m;
+  };
+  mk(new THREE.PlaneGeometry(innerWidth, innerDepth), 0, floorY, 0, -Math.PI/2, 0, 0);
+  mk(new THREE.PlaneGeometry(innerWidth, innerHeight), 0, wallCenterY, -size.x*.5 + insetX, 0, 0, 0);
+  mk(new THREE.PlaneGeometry(innerWidth, innerHeight), 0, wallCenterY,  size.x*.5 - insetX, 0, Math.PI, 0);
+  mk(new THREE.PlaneGeometry(innerDepth, innerHeight), -size.z*.5 + insetZ, wallCenterY, 0, 0,  Math.PI/2, 0);
+  mk(new THREE.PlaneGeometry(innerDepth, innerHeight),  size.z*.5 - insetZ, wallCenterY, 0, 0, -Math.PI/2, 0);
+  // O FBX usa X/Z invertidos em relação ao revestimento que montamos.
+  // Gira somente o interior 90° para ele encaixar no volume do baú.
+  g.rotation.y = Math.PI / 2;
+  return g;
+}
+
+try{
+  const manager=new THREE.LoadingManager();
+  const transparent='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M8AAAICAQB7CY3aAAAAAElFTkSuQmCC';
+  manager.setURLModifier(()=>transparent);
+  const fbx=await new FBXLoader(manager).loadAsync(FBX_URL);
+  fbx.updateMatrixWorld(true);
+  const candidates=[];
+  fbx.traverse(o=>{if(o.isMesh && !/UCX|collision/i.test(o.name)){const g=o.geometry.clone();g.applyMatrix4(o.matrixWorld);candidates.push(g)}});
+  if(!candidates.length)throw new Error('Não encontrei uma malha renderizável dentro do FBX.');
+  const bounds=new THREE.Box3(); candidates.forEach(g=>{g.computeBoundingBox();bounds.union(g.boundingBox)});
+  const center=bounds.getCenter(new THREE.Vector3()); const size=bounds.getSize(new THREE.Vector3()); chestSize.copy(size);
+  const splitY=bounds.min.y+size.y*.59;
+  // No FBX deste baú, a largura maior corre no eixo Z e a profundidade
+  // (frente/costas) corre no eixo X. Aqui vamos usar a dobradiça no lado
+  // oposto ao anterior, para a tampa abrir pelo outro lado do baú.
+  const hingeX=bounds.max.x;
+  candidates.forEach(g=>{
+    const parts=splitGeometry(g,splitY);
+    for(const [kind,geo] of Object.entries(parts)) if(geo){
+      geo.translate(-center.x,-center.y,-center.z);
+      const m=new THREE.Mesh(geo,chestMat);m.castShadow=true;m.receiveShadow=true;m.userData.chest=true;hitMeshes.push(m);
+      if(kind==='top')lidGroup.add(m);else bodyGroup.add(m);
+    }
+  });
+  const norm=2.65/Math.max(size.x,size.y,size.z); chestRoot.scale.setScalar(norm);
+  const py=(splitY-center.y), px=(hingeX-center.x);
+  lidPivot.position.set(px,py,0); lidGroup.position.set(-px,-py,0);
+  const innerLining = buildInnerLining(size, splitY, bounds.min.y);
+  // Recuo leve para trás e pequeno ajuste lateral de encaixe.
+  innerLining.position.set(-center.x - size.x*0.06,-center.y,-center.z);
+  bodyGroup.add(innerLining);
+  chestRoot.rotation.y=-.12;
+  ready=true;loading.classList.add('hide');
+}catch(err){
+  console.error(err); loading.classList.add('hide'); errorBox.style.display='block'; errorBox.textContent='Não consegui carregar o FBX: '+err.message;
+}
+
+const lootTable=[
+ {r:'COMUM',c:'#cdd0d7',name:'Bolsa de Moedas',desc:'120 moedas antigas encontradas.'},
+ {r:'RARO',c:'#5da8ff',name:'Anel do Navegante',desc:'Um artefato raro saiu do baú.'},
+ {r:'ÉPICO',c:'#b56cff',name:'Gema do Vazio',desc:'Ela pulsa com uma energia estranha.'},
+ {r:'LENDÁRIO',c:'#ffc85e',name:'Coroa do Eclipse',desc:'Um item lendário apareceu.'},
+ {r:'???',c:'#ff5f72',name:'Mímico!',desc:'O baú decidiu revidar. 😈'}
+];
+const orbMat=new THREE.MeshStandardMaterial({color:0xffd36b,emissive:0xff8f25,emissiveIntensity:4,metalness:.15,roughness:.22,transparent:true,opacity:0});
+const orb=new THREE.Mesh(new THREE.IcosahedronGeometry(.18,2),orbMat);orb.position.set(0,.2,0);scene.add(orb);
+const glow=new THREE.PointLight(0xffaa3f,0,4,2);scene.add(glow);
+
+const particleCount=100;
+const pGeo=new THREE.BufferGeometry(); const pPos=new Float32Array(particleCount*3); const pVel=[];
+for(let i=0;i<particleCount;i++){pVel.push(new THREE.Vector3());pPos[i*3+1]=-99}
+pGeo.setAttribute('position',new THREE.BufferAttribute(pPos,3));
+const pMat=new THREE.PointsMaterial({size:.045,color:0xffc95e,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending});
+const particles=new THREE.Points(pGeo,pMat);scene.add(particles);
+function burst(color){pMat.color.set(color);pMat.opacity=1;const a=pGeo.attributes.position.array;for(let i=0;i<particleCount;i++){a[i*3]=(Math.random()-.5)*.35;a[i*3+1]=.2+Math.random()*.3;a[i*3+2]=(Math.random()-.5)*.35;pVel[i].set((Math.random()-.5)*1.55,.8+Math.random()*1.8,(Math.random()-.5)*1.55)}pGeo.attributes.position.needsUpdate=true}
+
+let isOpen=false, eventTime=0, chosen=lootTable[3];
+function triggerChest(){if(!ready)return;isOpen=!isOpen;openTarget=isOpen?1:0;eventTime=performance.now()/1000;if(isOpen){chosen=lootTable[Math.floor(Math.random()*lootTable.length)];rarityEl.textContent=chosen.r;rarityEl.style.color=chosen.c;itemEl.textContent=chosen.name;descEl.textContent=chosen.desc;orbMat.color.set(chosen.c);orbMat.emissive.set(chosen.c);glow.color.set(chosen.c);pMat.color.set(chosen.c);setTimeout(()=>{if(isOpen){lootBox.classList.add('show');burst(chosen.c)}},420)}else{lootBox.classList.remove('show')}}
+
+const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();let down={x:0,y:0};
+renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}});
+renderer.domElement.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>7)return;pointer.x=e.clientX/innerWidth*2-1;pointer.y=-(e.clientY/innerHeight)*2+1;raycaster.setFromCamera(pointer,camera);if(raycaster.intersectObjects(hitMeshes,false).length)triggerChest()});
+
+function damp(a,b,l,dt){return THREE.MathUtils.lerp(a,b,1-Math.exp(-l*dt))}
+let last=performance.now()/1000;
+function animate(){requestAnimationFrame(animate);const now=performance.now()/1000,dt=Math.min(.04,now-last);last=now;controls.update();
+  chestFloat.position.y=Math.sin(now*1.65)*.055;
+  chestFloat.rotation.y=Math.sin(now*.55)*.018;
+  openProgress=damp(openProgress,openTarget,7.5,dt);
+  // A tampa gira ao redor da linha esquerda-direita do baú (eixo Z),
+  // agora com a dobradiça no lado oposto.
+  lidPivot.rotation.x=0;
+  // Com a dobradiça invertida, o sinal também precisa inverter para
+  // a tampa continuar abrindo para fora do baú.
+  lidPivot.rotation.z=-openProgress*1.45;
+  if(ready){const pulse=isOpen?1+Math.sin((now-eventTime)*7)*.012*(1-openProgress):1;chestRoot.scale.multiplyScalar(pulse);chestRoot.scale.divideScalar(pulse)}
+  const ease=Math.min(1,Math.max(0,(now-eventTime)*1.5));
+  if(isOpen){orb.position.y=damp(orb.position.y,.76,4.5,dt);orb.position.x=0;orb.position.z=.04;orbMat.opacity=damp(orbMat.opacity,.94,5,dt);orb.rotation.x+=dt*1.4;orb.rotation.y+=dt*2.1;glow.position.copy(orb.position);glow.intensity=damp(glow.intensity,12,5,dt)}else{orb.position.y=damp(orb.position.y,.2,5,dt);orbMat.opacity=damp(orbMat.opacity,0,6,dt);glow.intensity=damp(glow.intensity,0,6,dt)}
+  ring.material.opacity=.14+Math.sin(now*2)*.04;ring.rotation.z+=dt*.05;
+  const a=pGeo.attributes.position.array;let active=false;for(let i=0;i<particleCount;i++){if(a[i*3+1]<-50)continue;active=true;pVel[i].y-=2.4*dt;a[i*3]+=pVel[i].x*dt;a[i*3+1]+=pVel[i].y*dt;a[i*3+2]+=pVel[i].z*dt;if(a[i*3+1]<-1)a[i*3+1]=-99}if(active)pGeo.attributes.position.needsUpdate=true;pMat.opacity=damp(pMat.opacity,0,1.2,dt);
+  renderer.render(scene,camera)}
+animate();
+
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2))});
+</script>
+</body></html>
