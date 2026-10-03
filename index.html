@@ -184,7 +184,7 @@ try{
   lidPivot.position.set(px,py,0); lidGroup.position.set(-px,-py,0);
   const innerLining = buildInnerLining(size, splitY, bounds.min.y);
   // Recuo leve para trás e pequeno ajuste lateral de encaixe.
-  innerLining.position.set(-center.x,-center.y - size.y*0.12,-center.z);
+  innerLining.position.set(-center.x,-center.y - size.y*0.32,-center.z);
   bodyGroup.add(innerLining);
   chestRoot.rotation.y=-.12;
   ready=true;loading.classList.add('hide');
