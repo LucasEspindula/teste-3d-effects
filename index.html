@@ -158,7 +158,7 @@ function buildInnerLining(size, splitY, minY){
 try{
   const manager=new THREE.LoadingManager();
   const transparent='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M8AAAICAQB7CY3aAAAAAElFTkSuQmCC';
-  manager.setURLModifier(()=>transparent);
+  manager.setURLModifier(url => /\.fbx(?:$|[?#])/i.test(url) ? url : transparent);
   const fbx=await new FBXLoader(manager).loadAsync(FBX_URL);
   fbx.updateMatrixWorld(true);
   const candidates=[];
