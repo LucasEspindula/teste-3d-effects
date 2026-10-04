@@ -329,7 +329,7 @@ scene.add(alienDebugBox);
 const alienDebugLight=new THREE.PointLight(0xff0000,5,3,2);
 alienDebugLight.position.copy(alienDebugBox.position);
 scene.add(alienDebugLight);
-const alienMat=new THREE.MeshStandardMaterial({color:0x31483d,roughness:.72,metalness:.08,emissive:0x07120d,emissiveIntensity:.22,skinning:true});
+const alienMat=new THREE.MeshBasicMaterial({color:0x39ff14,side:THREE.DoubleSide,depthTest:false,depthWrite:true});
 async function loadAlien(){
   try{
     const manager=new THREE.LoadingManager();
@@ -347,12 +347,22 @@ async function loadAlien(){
     alienWrapper.position.copy(alienHome);
     alienWrapper.add(alien);
     alien.userData.wrapper=alienWrapper;
-    alien.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(!o.isSkinnedMesh)o.material=alienMat.clone();else if(o.material){o.material=o.material.clone();o.material.color?.set(0x31483d);o.material.roughness=.72;o.material.metalness=.08}}});
+    let meshCount=0,vertexCount=0;
+    alien.traverse(o=>{if(o.isMesh||o.isSkinnedMesh){
+      meshCount++;vertexCount+=o.geometry?.attributes?.position?.count||0;
+      o.visible=true;o.frustumCulled=false;o.castShadow=false;o.receiveShadow=false;
+      o.material=alienMat.clone();o.material.side=THREE.DoubleSide;o.material.depthTest=false;
+      o.renderOrder=998;
+    }});
     alienClips=alien.animations||[];
     // Durante a calibração deixamos a pose estática para enxergar escala/orientação.
     // As animações continuam disponíveis em alienClips para religarmos depois.
-    scene.add(alien.userData.wrapper||alien);
-    console.info('Alien carregado.',{size:sz.toArray(),scale,animations:alienClips.map(c=>c.name)});
+    const wrapper=alien.userData.wrapper||alien;
+    scene.add(wrapper);
+    wrapper.updateMatrixWorld(true);
+    const actualBox=new THREE.Box3().setFromObject(wrapper);
+    const helper=new THREE.Box3Helper(actualBox,0x00ffff);helper.renderOrder=1000;scene.add(helper);
+    console.info('Alien carregado.',{meshCount,vertexCount,size:sz.toArray(),scale,actualBounds:{min:actualBox.min.toArray(),max:actualBox.max.toArray()},animations:alienClips.map(c=>c.name)});
   }catch(e){console.warn('Não foi possível carregar o alien:',e)}
 }
 loadAlien();
