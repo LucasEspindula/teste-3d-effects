@@ -280,7 +280,9 @@ function specialFX(color){
   rayMat.color.set(color);haloMat.color.set(color);
   rays.forEach((r,i)=>{r.material.color.set(color);r.material.opacity=.72;r.rotation.y=i/rays.length*Math.PI*2+Math.random()*.35});
   flashMat.opacity=1;haloMat.opacity=.9;flash.scale.setScalar(1);halo.scale.setScalar(1);
-  fxGroup.position.set(0,.28,.04);
+  // Efeito principal nasce grande sob o baú, não em volta do item.
+  fxGroup.position.set(0,-.72,.04);
+  fxGroup.scale.setScalar(2.8);
 }
 
 let isOpen=false, eventTime=0, chosen=lootTable[3];
@@ -309,7 +311,8 @@ function animate(){requestAnimationFrame(animate);const now=performance.now()/10
   const fxAge=now-fxStart;
   if(fxAge<1.25){
     const fade=Math.max(0,1-fxAge/1.25);
-    fxGroup.position.y=.28+fxAge*.22;
+    // Mantém a explosão visual abaixo do baú e sobe só um pouco durante o impacto.
+    fxGroup.position.y=-.72+fxAge*.10;
     rays.forEach((r,i)=>{r.material.opacity=.62*fade;r.scale.y=1+fxAge*1.8;r.rotation.y+=dt*(.35+i*.025)});
     flashMat.opacity=Math.max(0,1-fxAge*4.2);flash.scale.setScalar(1+fxAge*5);
     haloMat.opacity=.8*fade;halo.scale.setScalar(1+fxAge*3.4);
