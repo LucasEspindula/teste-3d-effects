@@ -26,29 +26,12 @@ canvas{display:block;width:100%;height:100%;position:relative;z-index:0}
 #tip{position:fixed;left:50%;bottom:15px;z-index:4;transform:translateX(-50%);font-size:11px;color:#77798b;letter-spacing:.05em;white-space:nowrap}
 #error{position:fixed;left:50%;top:50%;z-index:20;transform:translate(-50%,-50%);display:none;width:min(90vw,560px);padding:18px 20px;border-radius:16px;background:#260f18e8;border:1px solid #ff698044;color:#ffdbe1;line-height:1.45}
 @media(max-width:600px){.title{margin-top:24px}.title p{padding:0 20px}#tip{bottom:8px}}
-
-    #lidControls{position:fixed;left:16px;bottom:16px;z-index:40;width:min(350px,calc(100vw - 32px));padding:14px 16px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(8,8,12,.84);backdrop-filter:blur(10px);color:#fff;font:12px/1.35 system-ui,sans-serif}
-    #lidControls strong{display:block;margin-bottom:9px;font-size:13px}
-    #lidControls label{display:grid;grid-template-columns:28px 1fr 52px;gap:8px;align-items:center;margin:7px 0}
-    #lidControls input[type=range]{width:100%}
-    #lidControls output{text-align:right;font-variant-numeric:tabular-nums;color:#ffd76a}
-    #lidControls button{margin-top:8px;padding:7px 10px;border:1px solid rgba(255,255,255,.18);border-radius:8px;background:#25252d;color:#fff;cursor:pointer}
 </style>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
 </script>
 </head>
 <body>
-  <div id="lidControls">
-    <strong>AJUSTE DO FUNDO DA TAMPA</strong>
-    <label>X <input id="lidX" type="range" min="-1" max="1" step="0.01" value="0"><output id="lidXOut">0.00</output></label>
-    <label>Y <input id="lidY" type="range" min="-1" max="1" step="0.01" value="0"><output id="lidYOut">0.00</output></label>
-    <label>Z <input id="lidZ" type="range" min="-1" max="1" step="0.01" value="0"><output id="lidZOut">0.00</output></label>
-    <label>L <input id="lidW" type="range" min="0.5" max="1.5" step="0.01" value="1"><output id="lidWOut">1.00</output></label>
-    <label>RX <input id="lidRX" type="range" min="0.5" max="1.5" step="0.01" value="1"><output id="lidRXOut">1.00</output></label>
-    <label>RY <input id="lidRY" type="range" min="0.5" max="1.5" step="0.01" value="1"><output id="lidRYOut">1.00</output></label>
-    <button id="lidReset" type="button">Resetar</button>
-  </div>
 <div id="app"></div>
 <div id="loading"><div class="loader"><div class="spinner"></div><div>Carregando o baú 3D real…</div></div></div>
 <div class="ui"><div class="title"><div class="badge"><i></i> FBX + PBR REAL</div><h1>Baú do Tesouro</h1><p>Arraste para girar. Clique no baú para abrir.</p></div></div>
@@ -233,26 +216,13 @@ try{
   // Forro curvo acompanha a tampa porque vive dentro do lidGroup.
   const lidLining = buildLidLining(size, splitY, bounds.max.y);
   const lidLiningBase = new THREE.Vector3(-center.x,-center.y,-center.z);
-  lidLining.position.copy(lidLiningBase);
+  lidLining.position.set(
+    lidLiningBase.x + size.x*0.26,
+    lidLiningBase.y + size.y*(-0.08),
+    lidLiningBase.z + size.z*0.01
+  );
+  lidLining.scale.set(0.99,1.02,1.12);
   lidGroup.add(lidLining);
-
-  const lidCtl = {
-    x:document.getElementById('lidX'), y:document.getElementById('lidY'), z:document.getElementById('lidZ'),
-    w:document.getElementById('lidW'), rx:document.getElementById('lidRX'), ry:document.getElementById('lidRY')
-  };
-  function updateLidLining(){
-    const x=+lidCtl.x.value,y=+lidCtl.y.value,z=+lidCtl.z.value;
-    const w=+lidCtl.w.value,rx=+lidCtl.rx.value,ry=+lidCtl.ry.value;
-    lidLining.position.set(lidLiningBase.x+size.x*x,lidLiningBase.y+size.y*y,lidLiningBase.z+size.z*z);
-    // O arco está no plano X/Y; Z controla a largura através da tampa.
-    lidLining.scale.set(rx,ry,w);
-    for(const [id,v] of [['lidXOut',x],['lidYOut',y],['lidZOut',z],['lidWOut',w],['lidRXOut',rx],['lidRYOut',ry]]) document.getElementById(id).value=v.toFixed(2);
-  }
-  Object.values(lidCtl).forEach(el=>el.addEventListener('input',updateLidLining));
-  document.getElementById('lidReset').addEventListener('click',()=>{
-    lidCtl.x.value=lidCtl.y.value=lidCtl.z.value='0';
-    lidCtl.w.value=lidCtl.rx.value=lidCtl.ry.value='1';
-    updateLidLining();
   });
   updateLidLining();
   const innerLining = buildInnerLining(size, splitY, bounds.min.y);
