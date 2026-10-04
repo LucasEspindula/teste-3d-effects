@@ -315,8 +315,9 @@ innerLining.scale.set(1.09,1,0.99);
 }
 
 // Mob alien: carrega o FBX separado, aplica material provisório e usa a primeira animação disponível.
-let alien=null,alienMixer=null,alienClips=[],alienState='patrol',alienAngle=0;
-const alienHome=new THREE.Vector3(-3,-1.02,-2.6);
+let alien=null,alienMixer=null,alienClips=[],alienState='showcase',alienAngle=0;
+// Calibração: deixa o mob parado, bem na frente do spawn do jogador.
+const alienHome=new THREE.Vector3(0,-1.02,1.35);
 const alienMat=new THREE.MeshStandardMaterial({color:0x31483d,roughness:.72,metalness:.08,emissive:0x07120d,emissiveIntensity:.22,skinning:true});
 async function loadAlien(){
   try{
@@ -333,7 +334,8 @@ async function loadAlien(){
     alien.position.x-=ctr.x*scale;alien.position.y-=box.min.y*scale;alien.position.z-=ctr.z*scale;
     alien.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(!o.isSkinnedMesh)o.material=alienMat.clone();else if(o.material){o.material=o.material.clone();o.material.color?.set(0x31483d);o.material.roughness=.72;o.material.metalness=.08}}});
     alienClips=alien.animations||[];
-    if(alienClips.length){alienMixer=new THREE.AnimationMixer(alien);alienMixer.clipAction(alienClips[0]).reset().play()}
+    // Durante a calibração deixamos a pose estática para enxergar escala/orientação.
+    // As animações continuam disponíveis em alienClips para religarmos depois.
     scene.add(alien);
     console.info('Alien carregado. Animações:',alienClips.map(c=>c.name));
   }catch(e){console.warn('Não foi possível carregar o alien:',e)}
@@ -466,22 +468,9 @@ function animate(){requestAnimationFrame(animate);const now=performance.now()/10
   const flat=Math.hypot(camera.position.x,camera.position.z);if(flat>worldRadius){camera.position.x*=worldRadius/flat;camera.position.z*=worldRadius/flat}
   camera.position.y=playerHeight;
   // Sem movimento cinematográfico da câmera em primeira pessoa.
-  if(alien){
-    alienMixer?.update(dt);
-    const mobPos=new THREE.Vector3();alien.getWorldPosition(mobPos);
-    const toPlayer=new THREE.Vector3(camera.position.x-mobPos.x,0,camera.position.z-mobPos.z);
-    const dist=toPlayer.length();
-    if(dist<3.25)alienState='chase';else if(dist>4.4)alienState='patrol';
-    if(alienState==='chase'&&dist>.72){
-      toPlayer.normalize();alien.position.x+=toPlayer.x*.72*dt;alien.position.z+=toPlayer.z*.72*dt;
-      alien.rotation.y=Math.atan2(toPlayer.x,toPlayer.z);
-    }else if(alienState==='patrol'){
-      alienAngle+=dt*.42;
-      const tx=alienHome.x+Math.cos(alienAngle)*1.05,tz=alienHome.z+Math.sin(alienAngle)*.72;
-      const dir=new THREE.Vector3(tx-alien.position.x,0,tz-alien.position.z);
-      if(dir.lengthSq()>.002){dir.normalize();alien.position.x+=dir.x*.38*dt;alien.position.z+=dir.z*.38*dt;alien.rotation.y=Math.atan2(dir.x,dir.z)}
-    }
-  }
+  // Mob congelado durante a calibração visual.
+  if(alien){alien.rotation.y=Math.PI;}
+
 
   chestFloat.position.y=Math.sin(now*1.65)*.055;
   chestFloat.rotation.y=Math.sin(now*.55)*.018;
