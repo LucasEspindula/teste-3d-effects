@@ -394,9 +394,14 @@ function animate(){requestAnimationFrame(animate);const now=performance.now()/10
     const cinematicTarget=cinematicBaseTarget.clone();cinematicTarget.y+=push*.12;
     controls.target.lerp(cinematicTarget,1-Math.exp(-8*dt));
   }else{
-    if(!controls.enabled)controls.enabled=true;
-    camera.position.lerp(cinematicBasePos,1-Math.exp(-3.2*dt));
-    controls.target.lerp(cinematicBaseTarget,1-Math.exp(-3.2*dt));
+    if(!controls.enabled){
+      // Encerra a tomada exatamente no ponto salvo e devolve o controle.
+      camera.position.copy(cinematicBasePos);
+      controls.target.copy(cinematicBaseTarget);
+      controls.enabled=true;
+    }
+    // Fora da tomada, OrbitControls manda sozinho. Não puxamos mais a câmera
+    // para cinematicBasePos a cada frame (isso era o "agarrando").
   }
   controls.update();
   chestFloat.position.y=Math.sin(now*1.65)*.055;
