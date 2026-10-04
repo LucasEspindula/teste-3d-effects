@@ -250,7 +250,14 @@ const lootTable=[
  {r:'???',c:'#ff5f72',icon:'👹',name:'Mímico!',desc:'O baú decidiu revidar. 😈'}
 ];
 const orbMat=new THREE.MeshStandardMaterial({color:0xffd36b,emissive:0xff8f25,emissiveIntensity:4,metalness:.15,roughness:.22,transparent:true,opacity:0});
-const orb=new THREE.Mesh(new THREE.IcosahedronGeometry(.18,2),orbMat);orb.position.set(0,.2,0);scene.add(orb);
+const orbGeometries={
+  'Bolsa de Moedas':new THREE.CylinderGeometry(.16,.16,.055,32),
+  'Anel do Navegante':new THREE.TorusGeometry(.14,.035,12,32),
+  'Gema do Vazio':new THREE.OctahedronGeometry(.17,0),
+  'Coroa do Eclipse':new THREE.CylinderGeometry(.16,.11,.16,6),
+  'Mímico!':new THREE.BoxGeometry(.26,.18,.20)
+};
+const orb=new THREE.Mesh(orbGeometries['Coroa do Eclipse'],orbMat);orb.position.set(0,.2,0);scene.add(orb);
 const glow=new THREE.PointLight(0xffaa3f,0,4,2);scene.add(glow);
 
 const particleCount=100;
@@ -290,7 +297,7 @@ function specialFX(color){
 }
 
 let isOpen=false, eventTime=0, chosen=lootTable[3];
-function triggerChest(){if(!ready)return;isOpen=!isOpen;openTarget=isOpen?1:0;eventTime=performance.now()/1000;if(isOpen){chosen=lootTable[Math.floor(Math.random()*lootTable.length)];rarityEl.textContent=chosen.r;rarityEl.style.color=chosen.c;itemEl.textContent=chosen.name;descEl.textContent=chosen.desc;lootIconEl.textContent=chosen.icon;lootIconEl.style.color=chosen.c;lootIconEl.classList.remove('pop');void lootIconEl.offsetWidth;lootIconEl.classList.add('pop');orbMat.color.set(chosen.c);orbMat.emissive.set(chosen.c);glow.color.set(chosen.c);pMat.color.set(chosen.c);specialFX(chosen.c);setTimeout(()=>{if(isOpen){lootBox.classList.add('show');burst(chosen.c);specialFX(chosen.c)}},420)}else{lootBox.classList.remove('show')}}
+function triggerChest(){if(!ready)return;isOpen=!isOpen;openTarget=isOpen?1:0;eventTime=performance.now()/1000;if(isOpen){chosen=lootTable[Math.floor(Math.random()*lootTable.length)];rarityEl.textContent=chosen.r;rarityEl.style.color=chosen.c;itemEl.textContent=chosen.name;descEl.textContent=chosen.desc;lootIconEl.textContent=chosen.icon;lootIconEl.style.color=chosen.c;lootIconEl.classList.remove('pop');void lootIconEl.offsetWidth;lootIconEl.classList.add('pop');orb.geometry=orbGeometries[chosen.name]||orbGeometries['Gema do Vazio'];orbMat.color.set(chosen.c);orbMat.emissive.set(chosen.c);glow.color.set(chosen.c);pMat.color.set(chosen.c);specialFX(chosen.c);setTimeout(()=>{if(isOpen){lootBox.classList.add('show');burst(chosen.c);specialFX(chosen.c)}},420)}else{lootBox.classList.remove('show')}}
 
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();let down={x:0,y:0};
 renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}});
