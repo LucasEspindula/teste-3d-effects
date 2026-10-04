@@ -249,7 +249,13 @@ const lootTable=[
  {r:'LENDÁRIO',c:'#ffc85e',icon:'👑',name:'Coroa do Eclipse',desc:'Um item lendário apareceu.'},
  {r:'???',c:'#ff5f72',icon:'👹',name:'Mímico!',desc:'O baú decidiu revidar. 😈'}
 ];
-const orbMat=new THREE.MeshStandardMaterial({color:0xffd36b,emissive:0xff8f25,emissiveIntensity:4,metalness:.15,roughness:.22,transparent:true,opacity:0});
+const lootMaterials={
+  'Bolsa de Moedas':new THREE.MeshStandardMaterial({color:0xd99b24,metalness:.92,roughness:.24,emissive:0x6b3500,emissiveIntensity:.38}),
+  'Anel do Navegante':new THREE.MeshStandardMaterial({color:0xb9d8ef,metalness:1,roughness:.16,emissive:0x163c66,emissiveIntensity:.5}),
+  'Gema do Vazio':new THREE.MeshPhysicalMaterial({color:0x8b45ff,metalness:.08,roughness:.08,transmission:.35,thickness:.35,ior:1.8,clearcoat:1,clearcoatRoughness:.06,emissive:0x35106f,emissiveIntensity:1.25,transparent:true,opacity:.92}),
+  'Coroa do Eclipse':new THREE.MeshStandardMaterial({color:0xffc447,metalness:.95,roughness:.2,emissive:0x6b3700,emissiveIntensity:.5}),
+  'Mímico!':new THREE.MeshStandardMaterial({map:baseMap,normalMap,roughnessMap:roughMap,metalnessMap:metalMap,roughness:.72,metalness:.35,emissive:0x3b0909,emissiveIntensity:.42})
+};
 const orbGeometries={
   'Bolsa de Moedas':new THREE.CylinderGeometry(.16,.16,.055,32),
   'Anel do Navegante':new THREE.TorusGeometry(.14,.035,12,32),
@@ -257,7 +263,7 @@ const orbGeometries={
   'Coroa do Eclipse':new THREE.CylinderGeometry(.16,.11,.16,6),
   'Mímico!':new THREE.BoxGeometry(.26,.18,.20)
 };
-const orb=new THREE.Mesh(orbGeometries['Coroa do Eclipse'],orbMat);orb.position.set(0,.2,0);scene.add(orb);
+const orb=new THREE.Mesh(orbGeometries['Coroa do Eclipse'],lootMaterials['Coroa do Eclipse']);orb.position.set(0,.2,0);scene.add(orb);
 const glow=new THREE.PointLight(0xffaa3f,0,4,2);scene.add(glow);
 
 const particleCount=100;
@@ -297,7 +303,7 @@ function specialFX(color){
 }
 
 let isOpen=false, eventTime=0, chosen=lootTable[3];
-function triggerChest(){if(!ready)return;isOpen=!isOpen;openTarget=isOpen?1:0;eventTime=performance.now()/1000;if(isOpen){chosen=lootTable[Math.floor(Math.random()*lootTable.length)];rarityEl.textContent=chosen.r;rarityEl.style.color=chosen.c;itemEl.textContent=chosen.name;descEl.textContent=chosen.desc;lootIconEl.textContent=chosen.icon;lootIconEl.style.color=chosen.c;lootIconEl.classList.remove('pop');void lootIconEl.offsetWidth;lootIconEl.classList.add('pop');orb.geometry=orbGeometries[chosen.name]||orbGeometries['Gema do Vazio'];orbMat.color.set(chosen.c);orbMat.emissive.set(chosen.c);glow.color.set(chosen.c);pMat.color.set(chosen.c);specialFX(chosen.c);setTimeout(()=>{if(isOpen){lootBox.classList.add('show');burst(chosen.c);specialFX(chosen.c)}},420)}else{lootBox.classList.remove('show')}}
+function triggerChest(){if(!ready)return;isOpen=!isOpen;openTarget=isOpen?1:0;eventTime=performance.now()/1000;if(isOpen){chosen=lootTable[Math.floor(Math.random()*lootTable.length)];rarityEl.textContent=chosen.r;rarityEl.style.color=chosen.c;itemEl.textContent=chosen.name;descEl.textContent=chosen.desc;lootIconEl.textContent=chosen.icon;lootIconEl.style.color=chosen.c;lootIconEl.classList.remove('pop');void lootIconEl.offsetWidth;lootIconEl.classList.add('pop');orb.geometry=orbGeometries[chosen.name]||orbGeometries['Gema do Vazio'];orb.material=lootMaterials[chosen.name]||lootMaterials['Gema do Vazio'];glow.color.set(chosen.c);pMat.color.set(chosen.c);specialFX(chosen.c);setTimeout(()=>{if(isOpen){lootBox.classList.add('show');burst(chosen.c);specialFX(chosen.c)}},420)}else{lootBox.classList.remove('show')}}
 
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();let down={x:0,y:0};
 renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}});
@@ -317,7 +323,7 @@ function animate(){requestAnimationFrame(animate);const now=performance.now()/10
   lidPivot.rotation.z=-openProgress*1.45;
   if(ready){const pulse=isOpen?1+Math.sin((now-eventTime)*7)*.012*(1-openProgress):1;chestRoot.scale.multiplyScalar(pulse);chestRoot.scale.divideScalar(pulse)}
   const ease=Math.min(1,Math.max(0,(now-eventTime)*1.5));
-  if(isOpen){orb.position.y=damp(orb.position.y,.76,4.5,dt);orb.position.x=0;orb.position.z=.04;orbMat.opacity=damp(orbMat.opacity,.94,5,dt);orb.rotation.x+=dt*1.4;orb.rotation.y+=dt*2.1;glow.position.copy(orb.position);glow.intensity=damp(glow.intensity,12,5,dt)}else{orb.position.y=damp(orb.position.y,.2,5,dt);orbMat.opacity=damp(orbMat.opacity,0,6,dt);glow.intensity=damp(glow.intensity,0,6,dt)}
+  if(isOpen){orb.position.y=damp(orb.position.y,.76,4.5,dt);orb.position.x=0;orb.position.z=.04;orb.material.opacity=damp(orb.material.opacity,.94,5,dt);orb.rotation.x+=dt*1.4;orb.rotation.y+=dt*2.1;glow.position.copy(orb.position);glow.intensity=damp(glow.intensity,12,5,dt)}else{orb.position.y=damp(orb.position.y,.2,5,dt);orb.material.opacity=damp(orb.material.opacity,0,6,dt);glow.intensity=damp(glow.intensity,0,6,dt)}
   ring.material.opacity=.14+Math.sin(now*2)*.04;ring.rotation.z+=dt*.05;
   const fxAge=now-fxStart;
   if(fxAge<1.25){
