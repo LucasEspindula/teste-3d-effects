@@ -326,18 +326,22 @@ async function loadAlien(){
     manager.setURLModifier(url=>/\.fbx(?:$|[?#])/i.test(url)?url:transparent);
     alien=await new FBXLoader(manager).loadAsync(MOB_FBX_URL);
     alien.updateMatrixWorld(true);
+    // Normaliza em um wrapper. Alterar a posição do FBX diretamente misturava
+    // coordenadas locais do arquivo com coordenadas do mundo e podia jogá-lo para longe.
     const box=new THREE.Box3().setFromObject(alien),sz=box.getSize(new THREE.Vector3()),ctr=box.getCenter(new THREE.Vector3());
     const targetHeight=1.25,scale=targetHeight/Math.max(.001,sz.y);
     alien.scale.setScalar(scale);
-    alien.position.copy(alienHome);
-    // Centraliza o modelo no próprio pivot sem destruir o rig.
-    alien.position.x-=ctr.x*scale;alien.position.y-=box.min.y*scale;alien.position.z-=ctr.z*scale;
+    alien.position.set(-ctr.x*scale,-box.min.y*scale,-ctr.z*scale);
+    const alienWrapper=new THREE.Group();
+    alienWrapper.position.copy(alienHome);
+    alienWrapper.add(alien);
+    alien.userData.wrapper=alienWrapper;
     alien.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(!o.isSkinnedMesh)o.material=alienMat.clone();else if(o.material){o.material=o.material.clone();o.material.color?.set(0x31483d);o.material.roughness=.72;o.material.metalness=.08}}});
     alienClips=alien.animations||[];
     // Durante a calibração deixamos a pose estática para enxergar escala/orientação.
     // As animações continuam disponíveis em alienClips para religarmos depois.
-    scene.add(alien);
-    console.info('Alien carregado. Animações:',alienClips.map(c=>c.name));
+    scene.add(alien.userData.wrapper||alien);
+    console.info('Alien carregado.',{size:sz.toArray(),scale,animations:alienClips.map(c=>c.name)});
   }catch(e){console.warn('Não foi possível carregar o alien:',e)}
 }
 loadAlien();
