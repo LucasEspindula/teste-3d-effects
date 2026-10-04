@@ -42,11 +42,11 @@ canvas{display:block;width:100%;height:100%;position:relative;z-index:0}
 <body>
 <div id="app"></div>
 <div id="loading"><div class="loader"><div class="spinner"></div><div>Carregando o baú 3D real…</div></div></div>
-<div class="ui"><div class="title"><div class="badge"><i></i> FBX + PBR REAL</div><h1>Baú do Tesouro</h1><p>Arraste para girar. Clique no baú para abrir.</p></div></div>
+<div class="ui"><div class="title"><div class="badge"><i></i> EXPLORAÇÃO 1ª PESSOA</div><h1>Câmara do Tesouro</h1><p>Clique na cena para explorar. WASD para andar • mouse para olhar • E abre o baú.</p></div></div>
 <div id="loot"><div class="loot-card"><div id="lootIcon">👑</div><div id="rarity">LENDÁRIO</div><div id="item">Coroa do Eclipse</div><div id="desc">Um loot raro apareceu do baú.</div></div></div>
 <button id="collectionBtn">🎒 Coleção <b id="collectionCount">0</b></button>
 <div id="collection"><div class="collection-title">Tesouros encontrados</div><div id="collectionGrid" class="collection-grid"></div></div>
-<div id="tip">ARRASTE • SCROLL PARA ZOOM • CLIQUE PARA ABRIR</div>
+<div id="tip">WASD • MOUSE PARA OLHAR • E PARA INTERAGIR • ESC LIBERA O MOUSE</div>
 <div id="error"></div>
 <script type="module">
 import * as THREE from 'three';
@@ -94,11 +94,22 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.18;
 app.appendChild(renderer.domElement);
 
+// Controle em primeira pessoa: o jogador não orbita mais preso ao baú.
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; controls.dampingFactor=.065; controls.enablePan=false;
-controls.minDistance=2.4; controls.maxDistance=7.2; controls.target.set(0,.12,0);
-controls.maxPolarAngle=Math.PI*.72; controls.minPolarAngle=Math.PI*.17;
-let cinematicBasePos=camera.position.clone(), cinematicBaseTarget=controls.target.clone();
+controls.enabled=false;
+camera.position.set(0,.62,4.25);
+camera.rotation.order='YXZ';
+let yaw=0,pitch=-.08,pointerLocked=false;
+const keys={};
+const playerHeight=.62, moveSpeed=2.15, worldRadius=5.4;
+function applyLook(){camera.rotation.y=yaw;camera.rotation.x=pitch}
+applyLook();
+renderer.domElement.addEventListener('click',()=>{if(!pointerLocked)renderer.domElement.requestPointerLock?.()});
+document.addEventListener('pointerlockchange',()=>{pointerLocked=document.pointerLockElement===renderer.domElement});
+document.addEventListener('mousemove',e=>{if(!pointerLocked)return;yaw-=e.movementX*.0022;pitch-=e.movementY*.0022;pitch=THREE.MathUtils.clamp(pitch,-1.35,1.35);applyLook()});
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyE'&&!e.repeat)tryInteract()});
+addEventListener('keyup',e=>keys[e.code]=false);
+let cinematicBasePos=camera.position.clone(), cinematicBaseTarget=new THREE.Vector3();
 let cinematicUntil=0, cinematicStrength=0;
 const rarityPower={COMUM:.72,RARO:.9,'ÉPICO':1.12,'LENDÁRIO':1.42,'???':1.65};
 let audioCtx=null;
@@ -117,18 +128,12 @@ function playLootSound(rarity){
   notes.forEach((n,i)=>tone(n,.28,rarity==='???'?'sawtooth':'sine',rarity==='???'?.035:.028,.2+i*.075));
 }
 function beginCinematic(rarity){
-  const p=rarityPower[rarity]||1;
-  // Parte sempre da câmera que o jogador escolheu, em vez de puxar
-  // para a posição inicial fixa e "agarrar" atrás do baú.
-  cinematicBasePos.copy(camera.position);
-  cinematicBaseTarget.copy(controls.target);
-  cinematicUntil=performance.now()/1000+1.45;cinematicStrength=p;
-  controls.enabled=false;
+  // Em primeira pessoa a câmera pertence sempre ao jogador.
+  // Mantemos os efeitos/sons de raridade sem sequestrar a visão.
+  cinematicStrength=rarityPower[rarity]||1;cinematicUntil=0;
 }
 
-renderer.domElement.style.cursor='grab';
-renderer.domElement.addEventListener('pointerdown',()=>renderer.domElement.style.cursor='grabbing');
-renderer.domElement.addEventListener('pointerup',()=>renderer.domElement.style.cursor='grab');
+renderer.domElement.style.cursor='crosshair';
 
 const hemi = new THREE.HemisphereLight(0x8ea3ff,0x2b1308,1.65); scene.add(hemi);
 const key = new THREE.SpotLight(0xffd28a,75,14,Math.PI*.26,.55,1.6); key.position.set(3.5,5,4.3); key.castShadow=true; key.shadow.mapSize.set(1024,1024); scene.add(key);
@@ -412,36 +417,29 @@ function specialFX(color,power=1){
 }
 
 let isOpen=false, eventTime=0, chosen=lootTable[3];
-function triggerChest(){if(!ready)return;isOpen=!isOpen;openTarget=isOpen?1:0;eventTime=performance.now()/1000;if(isOpen){chosen=lootTable[Math.floor(Math.random()*lootTable.length)];const power=rarityPower[chosen.r]||1;rarityEl.textContent=chosen.r;rarityEl.style.color=chosen.c;itemEl.textContent=chosen.name;descEl.textContent=chosen.desc;lootIconEl.textContent=chosen.icon;lootIconEl.style.color=chosen.c;lootIconEl.classList.remove('pop');void lootIconEl.offsetWidth;lootIconEl.classList.add('pop');selectLootVisual(chosen);glow.color.set(chosen.c);pMat.color.set(chosen.c);beginCinematic(chosen.r);playLootSound(chosen.r);specialFX(chosen.c,power);setTimeout(()=>{if(isOpen){lootBox.classList.add('show');burst(chosen.c);specialFX(chosen.c,power);saveLoot(chosen)}},420)}else{lootBox.classList.remove('show');controls.enabled=true}}
+function triggerChest(){if(!ready)return;isOpen=!isOpen;openTarget=isOpen?1:0;eventTime=performance.now()/1000;if(isOpen){chosen=lootTable[Math.floor(Math.random()*lootTable.length)];const power=rarityPower[chosen.r]||1;rarityEl.textContent=chosen.r;rarityEl.style.color=chosen.c;itemEl.textContent=chosen.name;descEl.textContent=chosen.desc;lootIconEl.textContent=chosen.icon;lootIconEl.style.color=chosen.c;lootIconEl.classList.remove('pop');void lootIconEl.offsetWidth;lootIconEl.classList.add('pop');selectLootVisual(chosen);glow.color.set(chosen.c);pMat.color.set(chosen.c);beginCinematic(chosen.r);playLootSound(chosen.r);specialFX(chosen.c,power);setTimeout(()=>{if(isOpen){lootBox.classList.add('show');burst(chosen.c);specialFX(chosen.c,power);saveLoot(chosen)}},420)}else{lootBox.classList.remove('show')}}
 
-const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();let down={x:0,y:0};
-renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}});
-renderer.domElement.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>7)return;pointer.x=e.clientX/innerWidth*2-1;pointer.y=-(e.clientY/innerHeight)*2+1;raycaster.setFromCamera(pointer,camera);if(raycaster.intersectObjects(hitMeshes,false).length)triggerChest()});
+const raycaster=new THREE.Raycaster();
+function tryInteract(){
+  if(!ready)return;
+  raycaster.setFromCamera(new THREE.Vector2(0,0),camera);
+  const hit=raycaster.intersectObjects(hitMeshes,false)[0];
+  if(hit&&hit.distance<3.15)triggerChest();
+}
 
 function damp(a,b,l,dt){return THREE.MathUtils.lerp(a,b,1-Math.exp(-l*dt))}
 let last=performance.now()/1000;
 function animate(){requestAnimationFrame(animate);const now=performance.now()/1000,dt=Math.min(.04,now-last);last=now;
-  if(now<cinematicUntil){
-    const age=Math.max(0,now-eventTime),t=Math.min(1,age/1.45),p=Math.sin(t*Math.PI);
-    const push=.34*cinematicStrength*p;
-    // Dolly na direção atual da câmera: não atravessa o baú nem escolhe "frente/trás".
-    const viewDir=new THREE.Vector3().subVectors(cinematicBaseTarget,cinematicBasePos).normalize();
-    const cinematicPos=cinematicBasePos.clone().addScaledVector(viewDir,push);
-    cinematicPos.y+=push*.08;
-    camera.position.lerp(cinematicPos,1-Math.exp(-7*dt));
-    const cinematicTarget=cinematicBaseTarget.clone();cinematicTarget.y+=push*.12;
-    controls.target.lerp(cinematicTarget,1-Math.exp(-8*dt));
-  }else{
-    if(!controls.enabled){
-      // Encerra a tomada exatamente no ponto salvo e devolve o controle.
-      camera.position.copy(cinematicBasePos);
-      controls.target.copy(cinematicBaseTarget);
-      controls.enabled=true;
-    }
-    // Fora da tomada, OrbitControls manda sozinho. Não puxamos mais a câmera
-    // para cinematicBasePos a cada frame (isso era o "agarrando").
-  }
-  controls.update();
+  // WASD relativo à direção em que o jogador olha, mantendo os pés no chão.
+  const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
+  const right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+  const move=new THREE.Vector3();
+  if(keys.KeyW)move.add(forward);if(keys.KeyS)move.sub(forward);if(keys.KeyD)move.add(right);if(keys.KeyA)move.sub(right);
+  if(move.lengthSq()>0){move.normalize().multiplyScalar(moveSpeed*dt);camera.position.add(move)}
+  const flat=Math.hypot(camera.position.x,camera.position.z);if(flat>worldRadius){camera.position.x*=worldRadius/flat;camera.position.z*=worldRadius/flat}
+  camera.position.y=playerHeight;
+  // Sem movimento cinematográfico da câmera em primeira pessoa.
+
   chestFloat.position.y=Math.sin(now*1.65)*.055;
   chestFloat.rotation.y=Math.sin(now*.55)*.018;
   openProgress=damp(openProgress,openTarget,7.5,dt);
