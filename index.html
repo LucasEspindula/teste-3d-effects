@@ -77,7 +77,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor=.065; controls.enablePan=false;
 controls.minDistance=2.4; controls.maxDistance=7.2; controls.target.set(0,.12,0);
 controls.maxPolarAngle=Math.PI*.72; controls.minPolarAngle=Math.PI*.17;
-const cinematicBasePos=camera.position.clone(), cinematicBaseTarget=controls.target.clone();
+let cinematicBasePos=camera.position.clone(), cinematicBaseTarget=controls.target.clone();
 let cinematicUntil=0, cinematicStrength=0;
 const rarityPower={COMUM:.72,RARO:.9,'ÉPICO':1.12,'LENDÁRIO':1.42,'???':1.65};
 let audioCtx=null;
@@ -97,6 +97,10 @@ function playLootSound(rarity){
 }
 function beginCinematic(rarity){
   const p=rarityPower[rarity]||1;
+  // Parte sempre da câmera que o jogador escolheu, em vez de puxar
+  // para a posição inicial fixa e "agarrar" atrás do baú.
+  cinematicBasePos.copy(camera.position);
+  cinematicBaseTarget.copy(controls.target);
   cinematicUntil=performance.now()/1000+1.45;cinematicStrength=p;
   controls.enabled=false;
 }
@@ -381,9 +385,14 @@ let last=performance.now()/1000;
 function animate(){requestAnimationFrame(animate);const now=performance.now()/1000,dt=Math.min(.04,now-last);last=now;
   if(now<cinematicUntil){
     const age=Math.max(0,now-eventTime),t=Math.min(1,age/1.45),p=Math.sin(t*Math.PI);
-    const push=.48*cinematicStrength*p;
-    camera.position.lerp(new THREE.Vector3(cinematicBasePos.x-push*.28,cinematicBasePos.y+push*.12,cinematicBasePos.z-push),1-Math.exp(-7*dt));
-    controls.target.lerp(new THREE.Vector3(0,.3+push*.18,0),1-Math.exp(-8*dt));
+    const push=.34*cinematicStrength*p;
+    // Dolly na direção atual da câmera: não atravessa o baú nem escolhe "frente/trás".
+    const viewDir=new THREE.Vector3().subVectors(cinematicBaseTarget,cinematicBasePos).normalize();
+    const cinematicPos=cinematicBasePos.clone().addScaledVector(viewDir,push);
+    cinematicPos.y+=push*.08;
+    camera.position.lerp(cinematicPos,1-Math.exp(-7*dt));
+    const cinematicTarget=cinematicBaseTarget.clone();cinematicTarget.y+=push*.12;
+    controls.target.lerp(cinematicTarget,1-Math.exp(-8*dt));
   }else{
     if(!controls.enabled)controls.enabled=true;
     camera.position.lerp(cinematicBasePos,1-Math.exp(-3.2*dt));
