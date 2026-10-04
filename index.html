@@ -318,6 +318,17 @@ innerLining.scale.set(1.09,1,0.99);
 let alien=null,alienMixer=null,alienClips=[],alienState='showcase',alienAngle=0;
 // Calibração: deixa o mob parado, bem na frente do spawn do jogador.
 const alienHome=new THREE.Vector3(0,-1.02,1.35);
+// Diagnóstico visual independente do FBX: esta caixa SEMPRE marca onde o mob deveria estar.
+const alienDebugBox=new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.5,1.5,1.5)),
+  new THREE.LineBasicMaterial({color:0xff0000,transparent:true,opacity:1,depthTest:false})
+);
+alienDebugBox.position.set(alienHome.x,alienHome.y+.75,alienHome.z);
+alienDebugBox.renderOrder=999;
+scene.add(alienDebugBox);
+const alienDebugLight=new THREE.PointLight(0xff0000,5,3,2);
+alienDebugLight.position.copy(alienDebugBox.position);
+scene.add(alienDebugLight);
 const alienMat=new THREE.MeshStandardMaterial({color:0x31483d,roughness:.72,metalness:.08,emissive:0x07120d,emissiveIntensity:.22,skinning:true});
 async function loadAlien(){
   try{
