@@ -77,6 +77,29 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor=.065; controls.enablePan=false;
 controls.minDistance=2.4; controls.maxDistance=7.2; controls.target.set(0,.12,0);
 controls.maxPolarAngle=Math.PI*.72; controls.minPolarAngle=Math.PI*.17;
+const cinematicBasePos=camera.position.clone(), cinematicBaseTarget=controls.target.clone();
+let cinematicUntil=0, cinematicStrength=0;
+const rarityPower={COMUM:.72,RARO:.9,'ÉPICO':1.12,'LENDÁRIO':1.42,'???':1.65};
+let audioCtx=null;
+function tone(freq,duration,type='sine',gain=.035,delay=0){
+  try{
+    audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+    const t=audioCtx.currentTime+delay,o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type=type;o.frequency.setValueAtTime(freq,t);o.frequency.exponentialRampToValueAtTime(Math.max(45,freq*.72),t+duration);
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(gain,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+duration);
+    o.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+duration+.03);
+  }catch(e){}
+}
+function playLootSound(rarity){
+  tone(105,.16,'triangle',.045,0);tone(72,.24,'sine',.055,.08);
+  const notes=rarity==='LENDÁRIO'?[523,659,784,1047]:rarity==='ÉPICO'?[392,523,659]:rarity==='RARO'?[330,440]:rarity==='???'?[95,72,55]:[262];
+  notes.forEach((n,i)=>tone(n,.28,rarity==='???'?'sawtooth':'sine',rarity==='???'?.035:.028,.2+i*.075));
+}
+function beginCinematic(rarity){
+  const p=rarityPower[rarity]||1;
+  cinematicUntil=performance.now()/1000+1.45;cinematicStrength=p;
+  controls.enabled=false;
+}
 
 renderer.domElement.style.cursor='grab';
 renderer.domElement.addEventListener('pointerdown',()=>renderer.domElement.style.cursor='grabbing');
@@ -336,18 +359,18 @@ const flash=new THREE.Mesh(new THREE.SphereGeometry(.16,18,12),flashMat);fxGroup
 const haloMat=new THREE.MeshBasicMaterial({color:0xffd36b,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
 const halo=new THREE.Mesh(new THREE.RingGeometry(.16,.22,48),haloMat);halo.rotation.x=-Math.PI/2;fxGroup.add(halo);
 let fxStart=-99;
-function specialFX(color){
+function specialFX(color,power=1){
   fxStart=performance.now()/1000;
   rayMat.color.set(color);haloMat.color.set(color);
   rays.forEach((r,i)=>{r.material.color.set(color);r.material.opacity=.72;r.rotation.y=i/rays.length*Math.PI*2+Math.random()*.75});
   flashMat.opacity=1;haloMat.opacity=.9;flash.scale.setScalar(1);halo.scale.setScalar(1);
   // Efeito principal nasce grande sob o baú, não em volta do item.
   fxGroup.position.set(0,-.72,.04);
-  fxGroup.scale.setScalar(2.8);
+  fxGroup.scale.setScalar(2.8*power);
 }
 
 let isOpen=false, eventTime=0, chosen=lootTable[3];
-function triggerChest(){if(!ready)return;isOpen=!isOpen;openTarget=isOpen?1:0;eventTime=performance.now()/1000;if(isOpen){chosen=lootTable[Math.floor(Math.random()*lootTable.length)];rarityEl.textContent=chosen.r;rarityEl.style.color=chosen.c;itemEl.textContent=chosen.name;descEl.textContent=chosen.desc;lootIconEl.textContent=chosen.icon;lootIconEl.style.color=chosen.c;lootIconEl.classList.remove('pop');void lootIconEl.offsetWidth;lootIconEl.classList.add('pop');selectLootVisual(chosen);glow.color.set(chosen.c);pMat.color.set(chosen.c);specialFX(chosen.c);setTimeout(()=>{if(isOpen){lootBox.classList.add('show');burst(chosen.c);specialFX(chosen.c)}},420)}else{lootBox.classList.remove('show')}}
+function triggerChest(){if(!ready)return;isOpen=!isOpen;openTarget=isOpen?1:0;eventTime=performance.now()/1000;if(isOpen){chosen=lootTable[Math.floor(Math.random()*lootTable.length)];const power=rarityPower[chosen.r]||1;rarityEl.textContent=chosen.r;rarityEl.style.color=chosen.c;itemEl.textContent=chosen.name;descEl.textContent=chosen.desc;lootIconEl.textContent=chosen.icon;lootIconEl.style.color=chosen.c;lootIconEl.classList.remove('pop');void lootIconEl.offsetWidth;lootIconEl.classList.add('pop');selectLootVisual(chosen);glow.color.set(chosen.c);pMat.color.set(chosen.c);beginCinematic(chosen.r);playLootSound(chosen.r);specialFX(chosen.c,power);setTimeout(()=>{if(isOpen){lootBox.classList.add('show');burst(chosen.c);specialFX(chosen.c,power)}},420)}else{lootBox.classList.remove('show');controls.enabled=true}}
 
 const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();let down={x:0,y:0};
 renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}});
@@ -355,7 +378,18 @@ renderer.domElement.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-dow
 
 function damp(a,b,l,dt){return THREE.MathUtils.lerp(a,b,1-Math.exp(-l*dt))}
 let last=performance.now()/1000;
-function animate(){requestAnimationFrame(animate);const now=performance.now()/1000,dt=Math.min(.04,now-last);last=now;controls.update();
+function animate(){requestAnimationFrame(animate);const now=performance.now()/1000,dt=Math.min(.04,now-last);last=now;
+  if(now<cinematicUntil){
+    const age=Math.max(0,now-eventTime),t=Math.min(1,age/1.45),p=Math.sin(t*Math.PI);
+    const push=.48*cinematicStrength*p;
+    camera.position.lerp(new THREE.Vector3(cinematicBasePos.x-push*.28,cinematicBasePos.y+push*.12,cinematicBasePos.z-push),1-Math.exp(-7*dt));
+    controls.target.lerp(new THREE.Vector3(0,.3+push*.18,0),1-Math.exp(-8*dt));
+  }else{
+    if(!controls.enabled)controls.enabled=true;
+    camera.position.lerp(cinematicBasePos,1-Math.exp(-3.2*dt));
+    controls.target.lerp(cinematicBaseTarget,1-Math.exp(-3.2*dt));
+  }
+  controls.update();
   chestFloat.position.y=Math.sin(now*1.65)*.055;
   chestFloat.rotation.y=Math.sin(now*.55)*.018;
   openProgress=damp(openProgress,openTarget,7.5,dt);
@@ -367,7 +401,7 @@ function animate(){requestAnimationFrame(animate);const now=performance.now()/10
   lidPivot.rotation.z=-openProgress*1.45;
   if(ready){const pulse=isOpen?1+Math.sin((now-eventTime)*7)*.012*(1-openProgress):1;chestRoot.scale.multiplyScalar(pulse);chestRoot.scale.divideScalar(pulse)}
   const ease=Math.min(1,Math.max(0,(now-eventTime)*1.5));
-  if(isOpen){lootVisual.position.y=damp(lootVisual.position.y,.76,4.5,dt);lootVisual.position.x=0;lootVisual.position.z=.04;if(orb.visible)orb.material.opacity=damp(orb.material.opacity,.94,5,dt);lootVisual.rotation.x+=dt*1.4;lootVisual.rotation.y+=dt*2.1;glow.position.copy(lootVisual.position);glow.intensity=damp(glow.intensity,12,5,dt)}else{lootVisual.position.y=damp(lootVisual.position.y,.2,5,dt);if(orb.visible)orb.material.opacity=damp(orb.material.opacity,0,6,dt);glow.intensity=damp(glow.intensity,0,6,dt)}
+  if(isOpen){const rp=rarityPower[chosen.r]||1;const targetY=.68+.10*rp;lootVisual.position.y=damp(lootVisual.position.y,targetY,3.8+rp,dt);lootVisual.position.x=chosen.r==='???'?Math.sin((now-eventTime)*24)*.055:0;lootVisual.position.z=.04;if(orb.visible)orb.material.opacity=damp(orb.material.opacity,.94,5,dt);lootVisual.rotation.x+=dt*(.8+rp*.65);lootVisual.rotation.y+=dt*(1.15+rp*1.05);const pulse=1+Math.sin((now-eventTime)*(5+rp*2))*.035*rp;lootVisual.scale.setScalar(pulse);glow.position.copy(lootVisual.position);glow.intensity=damp(glow.intensity,9+5*rp,5,dt)}else{lootVisual.position.y=damp(lootVisual.position.y,.2,5,dt);if(orb.visible)orb.material.opacity=damp(orb.material.opacity,0,6,dt);glow.intensity=damp(glow.intensity,0,6,dt)}
   ring.material.opacity=.14+Math.sin(now*2)*.04;ring.rotation.z+=dt*.05;
   const fxAge=now-fxStart;
   if(fxAge<1.25){
