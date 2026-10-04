@@ -139,32 +139,22 @@ const ground = new THREE.Mesh(new THREE.CircleGeometry(3.25,96),new THREE.MeshSt
 ground.rotation.x=-Math.PI/2; ground.position.y=-1.04; ground.receiveShadow=true; scene.add(ground);
 const ring = new THREE.Mesh(new THREE.RingGeometry(1.25,1.31,96),new THREE.MeshBasicMaterial({color:0xd98a34,transparent:true,opacity:.2,side:THREE.DoubleSide})); ring.rotation.x=-Math.PI/2; ring.position.y=-1.025; scene.add(ring);
 
-// Primeira expansão do ambiente: plataforma de pedra + pilares/rúnicos.
+// Ambiente mais limpo: o baú fica como protagonista, cercado por pedras baixas e brasas.
 const envGroup=new THREE.Group();scene.add(envGroup);
-const stoneMat=new THREE.MeshStandardMaterial({color:0x171923,roughness:.92,metalness:.08});
-const trimMat=new THREE.MeshStandardMaterial({color:0x5b4227,roughness:.58,metalness:.62});
-const runeMat=new THREE.MeshStandardMaterial({color:0x4f2b12,roughness:.4,metalness:.45,emissive:0xd47725,emissiveIntensity:.28});
-const dais=new THREE.Mesh(new THREE.CylinderGeometry(2.25,2.48,.24,12),stoneMat);dais.position.y=-1.16;dais.receiveShadow=true;envGroup.add(dais);
-const daisTrim=new THREE.Mesh(new THREE.TorusGeometry(2.22,.035,8,72),trimMat);daisTrim.rotation.x=Math.PI/2;daisTrim.position.y=-1.025;envGroup.add(daisTrim);
-const envHitMeshes=[];
-function makePillar(x,z,rot=0){
-  const g=new THREE.Group();g.position.set(x,-.94,z);g.rotation.y=rot;
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(.26,.34,.18,6),stoneMat);base.position.y=.02;g.add(base);
-  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.16,.21,1.38,6),stoneMat);shaft.position.y=.79;shaft.castShadow=true;g.add(shaft);
-  const cap=new THREE.Mesh(new THREE.CylinderGeometry(.25,.18,.18,6),trimMat);cap.position.y=1.5;g.add(cap);
-  const rune=new THREE.Mesh(new THREE.TorusGeometry(.095,.018,6,24),runeMat);rune.position.set(0,1.02,.17);g.add(rune);
-  envHitMeshes.push(shaft,rune);envGroup.add(g);return {g,rune};
-}
-const envPillars=[
-  makePillar(-2.15,-1.45,.25),makePillar(2.15,-1.45,-.25),
-  makePillar(-2.38,1.15,-.18),makePillar(2.38,1.15,.18)
-];
-const backArch=new THREE.Group();backArch.position.set(0,-.95,-2.35);envGroup.add(backArch);
-const archL=new THREE.Mesh(new THREE.BoxGeometry(.28,1.65,.32),stoneMat),archR=archL.clone(),archTop=new THREE.Mesh(new THREE.BoxGeometry(2.05,.28,.32),stoneMat);
-archL.position.set(-.92,.83,0);archR.position.set(.92,.83,0);archTop.position.set(0,1.62,0);backArch.add(archL,archR,archTop);
-const portalMat=new THREE.MeshBasicMaterial({color:0x6d55ff,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
-const portal=new THREE.Mesh(new THREE.RingGeometry(.48,.56,48),portalMat);portal.position.set(0,.85,.18);backArch.add(portal);
-
+const stoneMat=new THREE.MeshStandardMaterial({color:0x171923,roughness:.94,metalness:.04});
+const trimMat=new THREE.MeshStandardMaterial({color:0x4d3825,roughness:.72,metalness:.28});
+const dais=new THREE.Mesh(new THREE.CylinderGeometry(2.28,2.5,.22,12),stoneMat);dais.position.y=-1.15;dais.receiveShadow=true;envGroup.add(dais);
+const daisTrim=new THREE.Mesh(new THREE.TorusGeometry(2.22,.025,7,72),trimMat);daisTrim.rotation.x=Math.PI/2;daisTrim.position.y=-1.025;envGroup.add(daisTrim);
+const debris=[];
+[
+ [-2.15,-.99,-1.45,.42,.18,.28,.25],[2.0,-1.0,-1.5,.5,.15,.3,-.32],
+ [-2.32,-1.0,.92,.34,.17,.45,.5],[2.25,-1.0,.82,.4,.2,.32,-.55],
+ [-1.42,-1.0,-2.0,.28,.13,.5,.16],[1.25,-1.0,-2.1,.46,.14,.25,-.18]
+].forEach(([x,y,z,w,h,d,r])=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),stoneMat);m.position.set(x,y,z);m.rotation.set(0,r,(Math.random()-.5)*.12);m.castShadow=true;m.receiveShadow=true;envGroup.add(m);debris.push(m)});
+const emberMat=new THREE.PointsMaterial({size:.035,color:0xff8a38,transparent:true,opacity:.55,depthWrite:false,blending:THREE.AdditiveBlending});
+const emberGeo=new THREE.BufferGeometry(),emberPos=new Float32Array(54);
+for(let i=0;i<18;i++){const a=Math.random()*Math.PI*2,r=1.7+Math.random()*.75;emberPos[i*3]=Math.cos(a)*r;emberPos[i*3+1]=-.92+Math.random()*.16;emberPos[i*3+2]=Math.sin(a)*r}
+emberGeo.setAttribute('position',new THREE.BufferAttribute(emberPos,3));const embers=new THREE.Points(emberGeo,emberMat);envGroup.add(embers);
 
 function decodeBase64(b64){const bin=atob(b64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return bytes.buffer}
 const tLoader = new THREE.TextureLoader();
@@ -465,8 +455,8 @@ function animate(){requestAnimationFrame(animate);const now=performance.now()/10
   const ease=Math.min(1,Math.max(0,(now-eventTime)*1.5));
   if(isOpen){const rp=rarityPower[chosen.r]||1;const targetY=.68+.10*rp;lootVisual.position.y=damp(lootVisual.position.y,targetY,3.8+rp,dt);lootVisual.position.x=chosen.r==='???'?Math.sin((now-eventTime)*24)*.055:0;lootVisual.position.z=.04;if(orb.visible)orb.material.opacity=damp(orb.material.opacity,.94,5,dt);lootVisual.rotation.x+=dt*(.8+rp*.65);lootVisual.rotation.y+=dt*(1.15+rp*1.05);const pulse=1+Math.sin((now-eventTime)*(5+rp*2))*.035*rp;lootVisual.scale.setScalar(pulse);glow.position.copy(lootVisual.position);glow.intensity=damp(glow.intensity,9+5*rp,5,dt)}else{lootVisual.position.y=damp(lootVisual.position.y,.2,5,dt);if(orb.visible)orb.material.opacity=damp(orb.material.opacity,0,6,dt);glow.intensity=damp(glow.intensity,0,6,dt)}
   ring.material.opacity=.14+Math.sin(now*2)*.04;ring.rotation.z+=dt*.05;
-  envPillars.forEach((p,i)=>{p.rune.material.emissiveIntensity=.24+Math.sin(now*1.8+i)*.13;p.rune.rotation.z+=dt*(i%2?-.22:.22)});
-  portal.material.opacity=.10+Math.sin(now*2.3)*.055;portal.rotation.z+=dt*.12;
+  emberMat.opacity=.42+Math.sin(now*2.1)*.13;embers.rotation.y+=dt*.025;
+  const ep=emberGeo.attributes.position.array;for(let i=0;i<18;i++){ep[i*3+1]+=.07*dt;if(ep[i*3+1]>-.58)ep[i*3+1]=-.94}emberGeo.attributes.position.needsUpdate=true;
   const fxAge=now-fxStart;
   if(fxAge<1.25){
     const fade=Math.max(0,1-fxAge/1.25);
