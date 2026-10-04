@@ -260,14 +260,14 @@ function burst(color){pMat.color.set(color);pMat.opacity=1;const a=pGeo.attribut
 const fxGroup=new THREE.Group();scene.add(fxGroup);
 const rayMat=new THREE.MeshBasicMaterial({color:0xffd36b,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
 const rays=[];
-for(let i=0;i<9;i++){
-  const geo=new THREE.ConeGeometry(.035,.95,5,1,true);
+for(let i=0;i<18;i++){
+  const geo=new THREE.ConeGeometry(.028,1.15,5,1,true);
   geo.translate(0,.475,0);
   const r=new THREE.Mesh(geo,rayMat.clone());
-  r.rotation.z=(Math.random()-.5)*.75;
-  r.rotation.x=(Math.random()-.5)*.55;
+  r.rotation.z=(Math.random()-.5)*1.35;
+  r.rotation.x=(Math.random()-.5)*1.05;
   r.rotation.y=Math.random()*Math.PI*2;
-  r.scale.setScalar(.6+Math.random()*.8);
+  r.scale.setScalar(.55+Math.random()*1.25);
   fxGroup.add(r);rays.push(r);
 }
 const flashMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
@@ -278,7 +278,7 @@ let fxStart=-99;
 function specialFX(color){
   fxStart=performance.now()/1000;
   rayMat.color.set(color);haloMat.color.set(color);
-  rays.forEach((r,i)=>{r.material.color.set(color);r.material.opacity=.72;r.rotation.y=i/rays.length*Math.PI*2+Math.random()*.35});
+  rays.forEach((r,i)=>{r.material.color.set(color);r.material.opacity=.72;r.rotation.y=i/rays.length*Math.PI*2+Math.random()*.75});
   flashMat.opacity=1;haloMat.opacity=.9;flash.scale.setScalar(1);halo.scale.setScalar(1);
   // Efeito principal nasce grande sob o baú, não em volta do item.
   fxGroup.position.set(0,-.72,.04);
@@ -313,9 +313,9 @@ function animate(){requestAnimationFrame(animate);const now=performance.now()/10
     const fade=Math.max(0,1-fxAge/1.25);
     // Mantém a explosão visual abaixo do baú e sobe só um pouco durante o impacto.
     fxGroup.position.y=-.72+fxAge*.10;
-    rays.forEach((r,i)=>{r.material.opacity=.62*fade;r.scale.y=1+fxAge*1.8;r.rotation.y+=dt*(.35+i*.025)});
+    rays.forEach((r,i)=>{r.material.opacity=.62*fade;r.scale.y=1+fxAge*2.8;r.rotation.y+=dt*(.35+i*.025)});
     flashMat.opacity=Math.max(0,1-fxAge*4.2);flash.scale.setScalar(1+fxAge*5);
-    haloMat.opacity=.8*fade;halo.scale.setScalar(1+fxAge*3.4);
+    haloMat.opacity=.8*fade;halo.scale.setScalar(1+fxAge*5.2);
   }else{rays.forEach(r=>r.material.opacity=0);flashMat.opacity=0;haloMat.opacity=0;}
   const a=pGeo.attributes.position.array;let active=false;for(let i=0;i<particleCount;i++){if(a[i*3+1]<-50)continue;active=true;pVel[i].y-=2.4*dt;a[i*3]+=pVel[i].x*dt;a[i*3+1]+=pVel[i].y*dt;a[i*3+2]+=pVel[i].z*dt;if(a[i*3+1]<-1)a[i*3+1]=-99}if(active)pGeo.attributes.position.needsUpdate=true;pMat.opacity=damp(pMat.opacity,0,1.2,dt);
   renderer.render(scene,camera)}
