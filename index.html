@@ -55,6 +55,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const FBX_URL = './assets/chest.fbx';;
+const MOB_FBX_URL = './assets/mobs/alien.fbx';
 const TEX = {"base":"./assets/base.png","normal":"./assets/normal.png","metallic":"./assets/metallic.png","roughness":"./assets/roughness.png","ao":"./assets/ao.png","height":"./assets/height.png"};
 const app = document.querySelector('#app');
 const loading = document.querySelector('#loading');
@@ -313,6 +314,32 @@ innerLining.scale.set(1.09,1,0.99);
   console.error(err); loading.classList.add('hide'); errorBox.style.display='block'; errorBox.textContent='Não consegui carregar o FBX: '+err.message;
 }
 
+// Mob alien: carrega o FBX separado, aplica material provisório e usa a primeira animação disponível.
+let alien=null,alienMixer=null,alienClips=[],alienState='patrol',alienAngle=0;
+const alienHome=new THREE.Vector3(-3,-1.02,-2.6);
+const alienMat=new THREE.MeshStandardMaterial({color:0x31483d,roughness:.72,metalness:.08,emissive:0x07120d,emissiveIntensity:.22,skinning:true});
+async function loadAlien(){
+  try{
+    const manager=new THREE.LoadingManager();
+    const transparent='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR42mNk+M8AAAICAQB7CY3aAAAAAElFTkSuQmCC';
+    manager.setURLModifier(url=>/\.fbx(?:$|[?#])/i.test(url)?url:transparent);
+    alien=await new FBXLoader(manager).loadAsync(MOB_FBX_URL);
+    alien.updateMatrixWorld(true);
+    const box=new THREE.Box3().setFromObject(alien),sz=box.getSize(new THREE.Vector3()),ctr=box.getCenter(new THREE.Vector3());
+    const targetHeight=1.25,scale=targetHeight/Math.max(.001,sz.y);
+    alien.scale.setScalar(scale);
+    alien.position.copy(alienHome);
+    // Centraliza o modelo no próprio pivot sem destruir o rig.
+    alien.position.x-=ctr.x*scale;alien.position.y-=box.min.y*scale;alien.position.z-=ctr.z*scale;
+    alien.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(!o.isSkinnedMesh)o.material=alienMat.clone();else if(o.material){o.material=o.material.clone();o.material.color?.set(0x31483d);o.material.roughness=.72;o.material.metalness=.08}}});
+    alienClips=alien.animations||[];
+    if(alienClips.length){alienMixer=new THREE.AnimationMixer(alien);alienMixer.clipAction(alienClips[0]).reset().play()}
+    scene.add(alien);
+    console.info('Alien carregado. Animações:',alienClips.map(c=>c.name));
+  }catch(e){console.warn('Não foi possível carregar o alien:',e)}
+}
+loadAlien();
+
 const lootTable=[
  {r:'COMUM',c:'#cdd0d7',icon:'🪙',name:'Bolsa de Moedas',desc:'120 moedas antigas encontradas.'},
  {r:'RARO',c:'#5da8ff',icon:'💍',name:'Anel do Navegante',desc:'Um artefato raro saiu do baú.'},
@@ -439,6 +466,22 @@ function animate(){requestAnimationFrame(animate);const now=performance.now()/10
   const flat=Math.hypot(camera.position.x,camera.position.z);if(flat>worldRadius){camera.position.x*=worldRadius/flat;camera.position.z*=worldRadius/flat}
   camera.position.y=playerHeight;
   // Sem movimento cinematográfico da câmera em primeira pessoa.
+  if(alien){
+    alienMixer?.update(dt);
+    const mobPos=new THREE.Vector3();alien.getWorldPosition(mobPos);
+    const toPlayer=new THREE.Vector3(camera.position.x-mobPos.x,0,camera.position.z-mobPos.z);
+    const dist=toPlayer.length();
+    if(dist<3.25)alienState='chase';else if(dist>4.4)alienState='patrol';
+    if(alienState==='chase'&&dist>.72){
+      toPlayer.normalize();alien.position.x+=toPlayer.x*.72*dt;alien.position.z+=toPlayer.z*.72*dt;
+      alien.rotation.y=Math.atan2(toPlayer.x,toPlayer.z);
+    }else if(alienState==='patrol'){
+      alienAngle+=dt*.42;
+      const tx=alienHome.x+Math.cos(alienAngle)*1.05,tz=alienHome.z+Math.sin(alienAngle)*.72;
+      const dir=new THREE.Vector3(tx-alien.position.x,0,tz-alien.position.z);
+      if(dir.lengthSq()>.002){dir.normalize();alien.position.x+=dir.x*.38*dt;alien.position.z+=dir.z*.38*dt;alien.rotation.y=Math.atan2(dir.x,dir.z)}
+    }
+  }
 
   chestFloat.position.y=Math.sin(now*1.65)*.055;
   chestFloat.rotation.y=Math.sin(now*.55)*.018;
